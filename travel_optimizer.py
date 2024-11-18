@@ -111,9 +111,26 @@ def create_model(dp_node, B, M, T_start, T_end, B_min=0):
     m.addConstr(gp.quicksum(y[DP, j] for j in A) == 1, name="StartAtDP") # Start of the trip
     m.addConstr(gp.quicksum(y[i, DP] for i in A) == 1, name="EndAtDP") # End of the trip
 
+    # Introduce variable for actual end time
+    T_end_actual = m.addVar(vtype=GRB.CONTINUOUS, name="T_end_actual")
+
+    # Define T_end_actual based on the time we return to DP
+    for i in A:
+        m.addConstr(
+            T_end_actual >= T[i] + d[i] + t[i][DP] - M * (1 - y[i, DP]),
+            name=f"EndTimeFrom_{i}"
+        )
+
+    # Ensure the trip ends by T_end
+    m.addConstr(T_end_actual <= T_end, name="EndTimeConstraint")
+
+    # Total duration including waiting time
+    total_duration = T_end_actual - T_start
+    m.addConstr(total_duration <= T_end - T_start, "TotalDuration")
+
     #Trip duration from T_start to T_end
-    total_duration = gp.quicksum(d[i] * x[i] for i in A) + gp.quicksum(t[i][j] * y[i, j] for i in N for j in N if i != j)
-    m.addConstr(total_duration <= T_end - T_start, "TotalDuration") # inequality -- can allow some extra time (for feasibility)
+    # total_duration = gp.quicksum(d[i] * x[i] for i in A) + gp.quicksum(t[i][j] * y[i, j] for i in N for j in N if i != j)
+    # m.addConstr(total_duration <= T_end - T_start, "TotalDuration") # inequality -- can allow some extra time (for feasibility)
 
     #Flow conservation for activities
     for j in A:
