@@ -3,14 +3,14 @@ import ast
 import gurobipy as gp
 from gurobipy import GRB, quicksum
 
-B = 200
-B_min = 0
-M = 10000
-T_start = 480
-T_end = 1260
-dp_node = 'DP2'
+# B = 200
+# B_min = 0
+# M = 1500
+# T_start = 480
+# T_end = 1260
+# dp_node = 'DP2'
 
-def parse_param(dp_node='DP2', node_file_path='./data/Dataset.xlsx', distance_file_path='./data/distance_in_min.xlsx'):
+def parse_param(dp_node='DP2', node_file_path='Dataset.xlsx', distance_file_path='distance_in_min.xlsx'):
     '''
     parsing parameters from excel file
     node_file : node related information
@@ -23,7 +23,6 @@ def parse_param(dp_node='DP2', node_file_path='./data/Dataset.xlsx', distance_fi
     T_set : Tour activities
     R : Attraction activities
     '''
-    
 
     # data load
     df = pd.read_excel(node_file_path)
@@ -65,11 +64,6 @@ def parse_param(dp_node='DP2', node_file_path='./data/Dataset.xlsx', distance_fi
     for k, v in df[df.type!='start_end'][['Name','Duration']].values:
         d.update({k:v})
 
-    # rating_Duration parameter
-    # ud = dict()
-    # for k, v in df[df.type!='start_end'][['Name','Rating_duration']].values:
-    #     ud.update({k:v})
-
     # cost parameter
     c = dict()
     for k, v in df[df.type!='start_end'][['Name','Price']].values:
@@ -98,39 +92,32 @@ def create_model(dp_node, B, M, T_start, T_end, B_min=0):
     m = gp.Model("TripScheduling")
     # Activity Selection Variables (x_i)
     x = m.addVars(A, vtype=GRB.BINARY, name="x")
-    # x = m.addVars(A, vtype=GRB.CONTINUOUS, name="x")
     # Sequencing Variables (y_{ij})
     y = m.addVars(N, N, vtype=GRB.BINARY, name="y")
-    # y = m.addVars(N, N, vtype=GRB.CONTINUOUS, name="y")
     # Start Time Variables (T_i)
     T = m.addVars(A, vtype=GRB.CONTINUOUS, name="T")
     # Sequence Position Variables (tau_i)
     tau = m.addVars(A, vtype=GRB.CONTINUOUS, lb=1, name="tau")
+    # Introduce variable for actual end time
+    T_end_actual = m.addVar(vtype=GRB.CONTINUOUS, name="T_end_actual")
 
     #Trip start and ends at specific designated point (home)
     m.addConstr(gp.quicksum(y[DP, j] for j in A) == 1, name="StartAtDP") # Start of the trip
     m.addConstr(gp.quicksum(y[i, DP] for i in A) == 1, name="EndAtDP") # End of the trip
 
-    # Introduce variable for actual end time
-    # T_end_actual = m.addVar(vtype=GRB.CONTINUOUS, name="T_end_actual")
-
-    # # Define T_end_actual based on the time we return to DP
-    # for i in A:
-    #     m.addConstr(
-    #         T_end_actual >= T[i] + d[i] + t[i][DP] - M * (1 - y[i, DP]),
-    #         name=f"EndTimeFrom_{i}"
-    #     )
-
-    # # Ensure the trip ends by T_end
-    # m.addConstr(T_end_actual <= T_end, name="EndTimeConstraint")
-
-    # # Total duration including waiting time
-    # total_duration = T_end_actual - T_start
-    # m.addConstr(total_duration <= T_end - T_start, "TotalDuration")
-
     #Trip duration from T_start to T_end
     total_duration = gp.quicksum(d[i] * x[i] for i in A) + gp.quicksum(t[i][j] * y[i, j] for i in N for j in N if i != j)
     m.addConstr(total_duration <= T_end - T_start, "TotalDuration") # inequality -- can allow some extra time (for feasibility)
+
+    # Define T_end_actual based on the time we return to DP
+    for i in A:
+        m.addConstr(
+            T_end_actual >= T[i] + d[i] + t[i][DP] - M * (1 - y[i, DP]),
+            name=f"EndTimeFrom_{i}"
+        )
+
+    # Ensure the trip ends by T_end
+    m.addConstr(T_end_actual <= T_end, name="EndTimeConstraint")
 
     #Flow conservation for activities
     for j in A:
