@@ -12,4 +12,4 @@
   - This Python script contains the core travel optimization model implemented using the Gurobi Optimizer. It defines the decision variables, constraints, and objective functions required to solve the travel scheduling problem.
 
 - travel_optimizer.ipynb
-  - This Jupyter Notebook contains the use cases and examples that were included in your report. It demonstrates the functionality of the travel optimization model with real-world scenarios and parameter setups.
+  - This Jupyter Notebook contains the use cases and examples that were included in report. It demonstrates the functionality of the travel optimization model with real-world scenarios and parameter setups.
