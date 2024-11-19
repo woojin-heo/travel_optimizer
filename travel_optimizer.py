@@ -3,12 +3,12 @@ import ast
 import gurobipy as gp
 from gurobipy import GRB, quicksum
 
-B = 150
-B_min =0
+B = 200
+B_min = 0
 M = 10000
-T_start = 540
-T_end = 1380
-dp_node = 'utown'
+T_start = 480
+T_end = 1260
+dp_node = 'DP2'
 
 def parse_param(dp_node='DP2', node_file_path='./data/Dataset.xlsx', distance_file_path='./data/distance_in_min.xlsx'):
     '''
@@ -110,6 +110,23 @@ def create_model(dp_node, B, M, T_start, T_end, B_min=0):
     #Trip start and ends at specific designated point (home)
     m.addConstr(gp.quicksum(y[DP, j] for j in A) == 1, name="StartAtDP") # Start of the trip
     m.addConstr(gp.quicksum(y[i, DP] for i in A) == 1, name="EndAtDP") # End of the trip
+
+    # Introduce variable for actual end time
+    # T_end_actual = m.addVar(vtype=GRB.CONTINUOUS, name="T_end_actual")
+
+    # # Define T_end_actual based on the time we return to DP
+    # for i in A:
+    #     m.addConstr(
+    #         T_end_actual >= T[i] + d[i] + t[i][DP] - M * (1 - y[i, DP]),
+    #         name=f"EndTimeFrom_{i}"
+    #     )
+
+    # # Ensure the trip ends by T_end
+    # m.addConstr(T_end_actual <= T_end, name="EndTimeConstraint")
+
+    # # Total duration including waiting time
+    # total_duration = T_end_actual - T_start
+    # m.addConstr(total_duration <= T_end - T_start, "TotalDuration")
 
     #Trip duration from T_start to T_end
     total_duration = gp.quicksum(d[i] * x[i] for i in A) + gp.quicksum(t[i][j] * y[i, j] for i in N for j in N if i != j)
