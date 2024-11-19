@@ -3,12 +3,12 @@ import ast
 import gurobipy as gp
 from gurobipy import GRB, quicksum
 
-# B = 200
-# B_min = 0
-# M = 1500
-# T_start = 480
-# T_end = 1260
-# dp_node = 'DP2'
+B = 200
+B_min = 0
+M = 1500
+T_start = 480
+T_end = 1260
+dp_node = 'DP2'
 
 def parse_param(dp_node='DP2', node_file_path='Dataset.xlsx', distance_file_path='distance_in_min.xlsx'):
     '''
@@ -109,13 +109,6 @@ def create_model(dp_node, B, M, T_start, T_end, B_min=0):
     total_duration = gp.quicksum(d[i] * x[i] for i in A) + gp.quicksum(t[i][j] * y[i, j] for i in N for j in N if i != j)
     m.addConstr(total_duration <= T_end - T_start, "TotalDuration") # inequality -- can allow some extra time (for feasibility)
 
-    # Define T_end_actual based on the time we return to DP
-    for i in A:
-        m.addConstr(
-            T_end_actual >= T[i] + d[i] + t[i][DP] - M * (1 - y[i, DP]),
-            name=f"EndTimeFrom_{i}"
-        )
-
     # Ensure the trip ends by T_end
     m.addConstr(T_end_actual <= T_end, name="EndTimeConstraint")
 
@@ -131,25 +124,29 @@ def create_model(dp_node, B, M, T_start, T_end, B_min=0):
         m.addConstr(T[i] >= s[i], name=f"StartTimeLB_{i}")
         m.addConstr(T[i] <= e[i] - d[i], name=f"StartTimeUB_{i}")
 
-    #Sequencing and Time
-    for i in N:
-        for j in N:
+    # Sequencing and Time Relationships
+    # From designated point to first activity
+    for j in A:
+        m.addConstr(
+            T[j] >= T_start + t[DP][j] - M * (1 - y[DP, j]),
+            name=f"TimeFromDP_{j}"
+        )
+
+    # Between activities
+    for i in A:
+        for j in A:
             if i != j:
-                if i == DP:
-                    # From DP to first activity
-                    m.addConstr(
-                        T[j] >= T_start + t[i][j] - M * (1 - y[i, j]),
-                        name=f"TimeFromDP_{j}"
-                    )
-                elif j == DP:
-                    # From last activity to DP (no T['DP'] needed)
-                    pass
-                else:
-                    # Between activities
-                    m.addConstr(
-                        T[j] >= T[i] + d[i] + t[i][j] - M * (1 - y[i, j]),
-                        name=f"TimeSeq_{i}_{j}"
-                    )
+                m.addConstr(
+                    T[j] >= T[i] + d[i] + t[i][j] - M * (1 - y[i, j]),
+                    name=f"TimeSeq_{i}_{j}"
+                )
+
+    # From last activity to designated point
+    for i in A:
+        m.addConstr(
+            T_end_actual >= T[i] + d[i] + t[i][DP] - M * (1 - y[i, DP]),
+            name=f"TimeToDP_{i}"
+        )
 
     #Budget constraint
     m.addConstr(gp.quicksum(c[i] * x[i] for i in A) <= B, name="BudgetConstraint")
